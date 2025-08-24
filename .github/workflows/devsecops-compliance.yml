@@ -82,7 +82,14 @@ jobs:
         kubectl create -f https://github.com/kyverno/kyverno/releases/latest/download/install.yaml
         
         # Wait for Kyverno to be ready
-        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=kyverno -n kyverno --timeout=300s
+        echo "Waiting for Kyverno deployments to be available..."
+        kubectl wait --for=condition=available deployment --all -n kyverno --timeout=300s || true
+        
+        # Additional wait for pods to be ready
+        echo "Waiting for Kyverno pods to be ready..."
+        sleep 30
+        kubectl get pods -n kyverno
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=kyverno-admission-controller -n kyverno --timeout=300s || true
         
         # Apply security policies
         echo "Applying Kyverno security policies..."
