@@ -52,22 +52,27 @@ jobs:
       run: |
         echo "🔍 Running CIS Kubernetes Benchmark with kube-bench..."
         
-        # Install kube-bench
-        curl -L https://github.com/aquasecurity/kube-bench/releases/latest/download/kube-bench_linux_amd64.tar.gz -o kube-bench.tar.gz
-        tar -xzf kube-bench.tar.gz
-        sudo mv kube-bench /usr/local/bin/
-        
         # Create results directory
         mkdir -p compliance-reports
         
-        # Run kube-bench and save results
-        echo "Running kube-bench CIS compliance scan..."
-        kube-bench --json > compliance-reports/kube-bench-results.json || true
-        kube-bench > compliance-reports/kube-bench-results.txt || true
+        # Install kube-bench using the job method for better compatibility
+        echo "Installing kube-bench..."
+        kubectl apply -f https://raw.githubusercontent.com/aquasecurity/kube-bench/main/job.yaml
+        
+        # Wait for kube-bench job to complete
+        echo "Waiting for kube-bench job to complete..."
+        kubectl wait --for=condition=complete job/kube-bench --timeout=300s || true
+        
+        # Get kube-bench results
+        echo "Retrieving kube-bench results..."
+        kubectl logs job/kube-bench > compliance-reports/kube-bench-results.txt || echo "Failed to get kube-bench logs" > compliance-reports/kube-bench-results.txt
         
         # Show summary
         echo "📊 CIS Compliance Summary:"
-        grep -E "(PASS|FAIL|WARN)" compliance-reports/kube-bench-results.txt | head -20 || true
+        grep -E "(PASS|FAIL|WARN)" compliance-reports/kube-bench-results.txt | head -20 || echo "No results found"
+        
+        # Clean up
+        kubectl delete job kube-bench || true
         
     - name: Deploy Kyverno Policies
       run: |
